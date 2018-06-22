@@ -12,10 +12,10 @@ matplotlib.use('TkAgg')
 
 
 # Set up audio
-sample_rate = 16000
+sample_rate = 32000
 no_channels = 1
-chunk =  640# Use a multiple of 8
-waterfallframes=2000
+chunk =  1280# Use a multiple of 8
+waterfallframes=200
 data_in = aa.PCM(aa.PCM_CAPTURE, aa.PCM_NORMAL)
 data_in.setchannels(no_channels)
 data_in.setrate(sample_rate)
@@ -38,10 +38,10 @@ def calculate_levels(data):
 
 root = Tk()
 
-mainframe = PanedWindow(root,orient=VERTICAL,showhandle=True,bg='black')
+#mainframe = PanedWindow(root,orient=VERTICAL,showhandle=True,bg='black')
 
 
-wftFrame=Frame(mainframe)
+wftFrame=Frame(root)
 
 fig = plt.figure()
 plot = fig.add_subplot(111)
@@ -51,14 +51,12 @@ ydata = np.zeros(chunk/2,dtype=float)
 waterfalldata=np.zeros([chunk/2,waterfallframes],dtype=float)
 
 line, = plot.plot(xdata,ydata,'-',color='green')
-plot.set_ylim(0,2000)
+plot.set_ylim(0,waterfallframes-1)
 
 canvas = FigureCanvasTkAgg(fig,master=wftFrame)
 plotwidg=canvas.get_tk_widget()
 
-toolbar = NavigationToolbar2TkAgg(canvas, wftFrame)
-toolbar.update()
-#canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=True)
+
 
 wfplot=fig.add_subplot(111)
 waterfalldata=np.zeros([waterfallframes,chunk/2],dtype=float)
@@ -68,24 +66,28 @@ wfwidg=wfcanvas.get_tk_widget()
 wfwidg.pack(side=TOP,fill=BOTH,expand=True)
 
 
-mainframe.add(wftFrame)
+wftFrame.pack(side=TOP,fill=BOTH,expand=True)
 
-mainframe.pack(side=TOP)
 root.title("Audio Plots")
-
+wrap=False
 timer=waterfallframes
-fig.canvas.draw()
 while True:
    timer-=1
    # Read data
    data_in.setperiodsize(chunk)
    l,data = data_in.read()
    power = calculate_levels(data)
-   waterfalldata[timer]=power
-   line.set_data(xdata,(power*20)+100)
+   if not wrap:
+       waterfalldata[timer]=power
+   else:
+       waterfalldata=np.roll(waterfalldata,(waterfallframes-2)*len(power))
+       waterfalldata[waterfallframes-1]=power
+   line.set_data(xdata,(power*(waterfallframes/100))+(waterfallframes/20))
    im.set_data(waterfalldata)
    fig.canvas.draw()
-   if timer==0:timer=waterfallframes
+   if timer==0:
+       wrap=True
+       timer=waterfallframes-1
 
 
 root.mainloop()
