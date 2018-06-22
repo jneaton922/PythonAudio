@@ -1,15 +1,21 @@
 #!/usr/bin/env python
 
+from Tkinter import *
 import alsaaudio as aa
 from time import sleep
 from struct import unpack
 import numpy as np
 from matplotlib import pyplot as plt
+import matplotlib
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+matplotlib.use('TkAgg')
+
 
 # Set up audio
 sample_rate = 16000
 no_channels = 1
-chunk =  320# Use a multiple of 8
+chunk =  640# Use a multiple of 8
+waterfallframes=2000
 data_in = aa.PCM(aa.PCM_CAPTURE, aa.PCM_NORMAL)
 data_in.setchannels(no_channels)
 data_in.setrate(sample_rate)
@@ -26,33 +32,60 @@ def calculate_levels(data):
     fourier=np.delete(fourier,len(fourier)-1)
    # Find amplitude
     power = (np.log10(np.abs(fourier))**2)-5
-    '''
-    for i in range (0,len(fourier)):
-    #for i in range (4,50):
-        for stars in range(0,int(power[i])):
-                print "*",
-        print ""
-    print "End"
-    '''
     return power
 
 
-plt.ion()
+
+root = Tk()
+
+mainframe = PanedWindow(root,orient=VERTICAL,showhandle=True,bg='black')
+
+
+wftFrame=Frame(mainframe)
 
 fig = plt.figure()
 plot = fig.add_subplot(111)
 
-xdata = np.linspace(0,sample_rate,chunk/2)
+xdata = np.linspace(0,chunk/2,chunk/2)
 ydata = np.zeros(chunk/2,dtype=float)
-line, = plot.plot(xdata,ydata,'-')
-plot.set_ylim(-20,100)
+waterfalldata=np.zeros([chunk/2,waterfallframes],dtype=float)
+
+line, = plot.plot(xdata,ydata,'-',color='green')
+plot.set_ylim(0,2000)
+
+canvas = FigureCanvasTkAgg(fig,master=wftFrame)
+plotwidg=canvas.get_tk_widget()
+
+toolbar = NavigationToolbar2TkAgg(canvas, wftFrame)
+toolbar.update()
+#canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=True)
+
+wfplot=fig.add_subplot(111)
+waterfalldata=np.zeros([waterfallframes,chunk/2],dtype=float)
+im = wfplot.imshow(waterfalldata,interpolation='nearest',origin='bottom',aspect='auto',vmin=-10,vmax=20,cmap='bone')
+wfcanvas=FigureCanvasTkAgg(fig,master=wftFrame)
+wfwidg=wfcanvas.get_tk_widget()
+wfwidg.pack(side=TOP,fill=BOTH,expand=True)
 
 
+mainframe.add(wftFrame)
 
+mainframe.pack(side=TOP)
+root.title("Audio Plots")
+
+timer=waterfallframes
+fig.canvas.draw()
 while True:
+   timer-=1
    # Read data
    data_in.setperiodsize(chunk)
    l,data = data_in.read()
    power = calculate_levels(data)
-   line.set_ydata(power)
+   waterfalldata[timer]=power
+   line.set_data(xdata,(power*20)+100)
+   im.set_data(waterfalldata)
    fig.canvas.draw()
+   if timer==0:timer=waterfallframes
+
+
+root.mainloop()
